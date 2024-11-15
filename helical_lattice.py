@@ -47,7 +47,7 @@ def main():
 
     st.title(title)
 
-    st.elements.utils._shown_default_value_warning = True
+    st.elements.lib.policies._shown_default_value_warning = True
 
     if len(st.session_state)<1:  # only run once at the start of the session
         #set_initial_session_state()
@@ -551,11 +551,11 @@ def convert_helical_lattice_to_2d_lattice(twist=30, rise=20, csym=1, diameter=10
       for ib in range(-1, 2):
         vabs.append(ia*va+ib*vb)
     vabs_good = []
-    area = np.linalg.norm( np.cross(va, vb) )
+    area = np.linalg.norm( np.cross(np.append(va, 0), np.append(vb, 0)) )
     for vai, vatmp in enumerate(vabs):
       for vbi in range(vai+1, len(vabs)):
         vbtmp = vabs[vbi]
-        areatmp = np.linalg.norm( np.cross(vatmp, vbtmp) )
+        areatmp = np.linalg.norm( np.cross(np.append(vatmp, 0), np.append(vbtmp, 0)) )
         if abs(areatmp-area)>err: continue
         vabs_good.append( (vatmp, vbtmp) )
     dist = []
