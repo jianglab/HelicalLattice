@@ -1,7 +1,7 @@
 """ 
 MIT License
 
-Copyright (c) 2022-2024 Wen Jiang
+Copyright (c) 2022-2025 Wen Jiang
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -85,7 +85,14 @@ def main():
 
         share_url = st.checkbox('Show sharable URL', value=False, help="Include relevant parameters in the browser URL to allow you to share the URL and reproduce the plots", key="share_url")
 
-        st.markdown("*Developed by the [Jiang Lab@Purdue University](https://jiang.bio.purdue.edu). Report problems to Wen Jiang (jiang12 at purdue.edu)*")
+        st.markdown("*Developed by the [Jiang Lab@Penn State University](https://jianglab.science.psu.edu). Report problems to [HelicalLattice@GitHub](https://github.com/jianglab/helicallattice/issues))*")
+
+    draw_axis = st.session_state.get("draw_axis", 1)
+    draw_cylinder = st.session_state.get("draw_cylinder", 0)
+    draw_equator_circle = st.session_state.get("draw_equator_circle", 1)
+    draw_equator_disk = st.session_state.get("draw_equator_disk", 1)
+    rot = st.session_state.get("rot", 0.0)
+    tilt = st.session_state.get("tilt", 0.0)
 
     if direction == "2D⇒Helical":
         col2, col3, col4 = st.columns((1, 0.8, 0.7), gap="small")
@@ -106,14 +113,14 @@ def main():
 
         with col4:
             st.subheader("Helical Lattice: rolled up from the starting 2D lattice ")
-            fig_helix = plot_helical_lattice(diameter2, length, twist2, rise2, csym2, marker_size=marker_size*0.6, figure_height=figure_height)
+            fig_helix = plot_helical_lattice(diameter2, length, twist2, rise2, csym2, rot=rot, tilt=tilt, marker_size=marker_size*0.6, figure_height=figure_height, draw_axis=draw_axis,draw_cylinder=draw_cylinder, draw_equator_circle=draw_equator_circle, draw_equator_disk=draw_equator_disk)
             st.plotly_chart(fig_helix, use_container_width=True)
     else:
         col2, col3, col4 = st.columns((0.7, 0.8, 1), gap="small")
     
         with col2:
             st.subheader("Helical Lattice")
-            fig_helix = plot_helical_lattice(diameter, length, twist, rise, csym, marker_size=marker_size*0.6, figure_height=figure_height)
+            fig_helix = plot_helical_lattice(diameter, length, twist, rise, csym, rot=rot, tilt=tilt, marker_size=marker_size*0.6, figure_height=figure_height, draw_axis=draw_axis,draw_cylinder=draw_cylinder, draw_equator_circle=draw_equator_circle, draw_equator_disk=draw_equator_disk)
             st.plotly_chart(fig_helix, use_container_width=True)
 
         with col3:
@@ -354,7 +361,7 @@ def plot_helical_lattice_unrolled(diameter, length, twist, rise, csym, marker_si
   return fig
 
 @st.cache_data(persist='disk', max_entries=1, show_spinner=False)
-def plot_helical_lattice(diameter, length, twist, rise, csym,  marker_size = 10, figure_height=500):
+def plot_helical_lattice(diameter, length, twist, rise, csym, rot=0, tilt=10, marker_size=10, figure_height=500, draw_equator_circle=True, draw_equator_disk=True, draw_cylinder=False, draw_axis=True):
   if rise>0:
     n = min(int(length/2/rise)+2, 1000)
     i = np.arange(-n, n+1)
@@ -393,7 +400,7 @@ def plot_helical_lattice(diameter, length, twist, rise, csym,  marker_size = 10,
     spiral = go.Scatter3d(x=x, y=y, z=z, mode ='lines', line = dict(color=color, width=marker_size/2), opacity=1, showlegend=False)
     fig.add_trace(spiral)
 
-  def cylinder(r, h, z0=0, n_points=100, nv =50):
+  def cylinder(r, h, z0=0, n_points=100, nv=50):
     theta = np.linspace(0, 2*np.pi, n_points)
     v = np.linspace(z0, z0+h, nv )
     theta, v = np.meshgrid(theta, v)
@@ -404,18 +411,41 @@ def plot_helical_lattice(diameter, length, twist, rise, csym,  marker_size = 10,
   
   def equator_circle(r, z, n_points=36):
     theta = np.linspace(0, 2*np.pi, n_points)
-    x= r*np.cos(theta)
+    x = r*np.cos(theta)
     y = r*np.sin(theta)
-    z0 = z*np.ones(theta.shape)
+    z0 = z*np.ones(x.shape)
     return x, y, z0
 
-  x, y, z = cylinder(r=diameter/2-marker_size/2, h=length, z0=-length/2)
-  colorscale = [[0, 'white'], [1, 'white']]
-  cyl = go.Surface(x=x, y=y, z=z, colorscale = colorscale, showscale=False, opacity=0.8)
-  fig.add_trace(cyl)
-  x, y, z = equator_circle(r=diameter/2, z=0)
-  equator = go.Scatter3d(x=x, y=y, z=z, mode ='lines', line = dict(color='grey', width=marker_size/2, dash='dash'), opacity=1, showlegend=False)
-  fig.add_trace(equator)
+  def equator_disk(r, z, n_points=36):
+    rad = np.linspace(0, r, n_points)
+    theta = np.linspace(0, 2*np.pi, n_points)
+    rad, theta = np.meshgrid(rad, theta)
+    x = rad*np.cos(theta)
+    y = rad*np.sin(theta)
+    z0 = z*np.ones(x.shape)
+    return x, y, z0
+
+  if draw_axis:
+    axis = go.Scatter3d(x=[0, 0], y=[0, 0], z=[-length/2, length/2], mode='lines', line=dict(color='grey', width=marker_size/2, dash='dash'), opacity=1, showlegend=False)
+    fig.add_trace(axis)
+     
+  if draw_cylinder:
+    x, y, z = cylinder(r=diameter/2-marker_size/2, h=length, z0=-length/2)
+    print(f"x {x.shape=}")
+    colorscale = [[0, 'white'], [1, 'white']]
+    cyl = go.Surface(x=x, y=y, z=z, colorscale = colorscale, showscale=False, opacity=0.2)
+    fig.add_trace(cyl)
+
+  if draw_equator_circle:
+    x, y, z = equator_circle(r=diameter/2, z=0)
+    equator = go.Scatter3d(x=x, y=y, z=z, mode='lines', line=dict(color='grey', width=marker_size/2, dash='dash'), opacity=1, showlegend=False)
+    fig.add_trace(equator)
+
+  if draw_equator_disk:
+    x, y, z = equator_disk(r=diameter/2, z=0)
+    colorscale = [[0, 'grey'], [1, 'grey']]
+    equator = go.Surface(x=x, y=y, z=z, colorscale = colorscale, showscale=False, opacity=0.2)
+    fig.add_trace(equator)
 
   title = f"pitch={rise*abs(360/twist):.2f}Å\ttwist={twist:.2f}° rise={rise:.2f}Å sym=c{csym}<br>diameter={diameter:.2f}Å circumference={np.pi*diameter:.2f}Å"
   fig.update_layout(title_text=title, title_x=0.5, title_xanchor="center")
@@ -423,7 +453,7 @@ def plot_helical_lattice(diameter, length, twist, rise, csym,  marker_size = 10,
   camera = dict(
     up=dict(x=0, y=0, z=1),
     center=dict(x=0, y=0, z=0),
-    eye=dict(x=1, y=0, z=0)
+    eye=dict(x=np.cos(np.deg2rad(tilt))*np.cos(np.deg2rad(rot)), y=-np.sin(np.deg2rad(rot)), z=np.sin(np.deg2rad(tilt)))
   )
   fig.update_layout(scene_camera=camera)
 
@@ -585,8 +615,8 @@ def convert_helical_lattice_to_2d_lattice(twist=30, rise=20, csym=1, diameter=10
 
   return va, vb, endpoint
 
-int_types = {'csym':1, 'figure_height':800, 'horizontal':1, 'na':16, 'nb':1, 'primitive_unitcell':0, 'share_url':0}
-float_types = {'ax':34.65, 'ay':0.0, 'bx':10.63, 'by':-23.01, 'diameter':290.0, 'lattice_size_factor':1.25, 'length':1000.0, 'marker_size':5.0, 'rise':19.4, 'twist':-81.1}
+int_types = {'csym':1, 'draw_axis':1, 'draw_cylinder':0, 'draw_equator_circle':1, 'draw_equator_disk':1, 'figure_height':800, 'horizontal':1, 'na':16, 'nb':1, 'primitive_unitcell':0, 'share_url':0}
+float_types = {'ax':34.65, 'ay':0.0, 'bx':10.63, 'by':-23.01, 'diameter':290.0, 'lattice_size_factor':1.25, 'length':1000.0, 'marker_size':5.0, 'rise':19.4, 'rot':0, 'tilt':0, 'twist':-81.1}
 default_values = int_types | float_types | {'direction':'Helical⇒2D', }
 def set_initial_session_state():
     for attr in sorted(default_values.keys()):
